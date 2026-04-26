@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PEA Budget Control</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <img src="./assets/pea-mark.svg" alt="PEA" />
+          <div>
+            <strong>PEA Budget</strong>
+            <span>ระบบลงคุมงบทำการ</span>
+          </div>
+        </div>
+        <div class="budget-switch-wrap sidebar-budget-switch">
+          <label>
+            งบประมาณ
+            <select id="budgetSwitch"></select>
+          </label>
+        </div>
+        <nav class="nav">
+          <a class="active" href="#overview">ภาพรวม</a>
+          <a href="#claim-form">ลงคุมงบ</a>
+          <a href="#categories">หมวดงบ</a>
+          <a href="#transactions">รายการล่าสุด</a>
+        </nav>
+        <div class="sidebar-card">
+          <span>ปีงบประมาณ</span>
+          <strong id="budgetYear">2569</strong>
+        </div>
+        <div class="sidebar-card integration-card">
+          <span>Google Sheet</span>
+          <strong id="sheetStatus">Offline</strong>
+          <small id="sheetStatusText">ยังไม่ได้ตั้งค่า Apps Script URL</small>
+        </div>
+      </aside>
+
+      <main class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Provincial Electricity Authority</p>
+            <h1>ลงคุมงบภายในแผนกวางแผนพัฒนาระบบไฟฟ้า</h1>
+          </div>
+          <div class="topbar-actions">
+            <button class="ghost-button" id="adminLogin" type="button" title="Admin Login">
+              <span aria-hidden="true">⌘</span>
+              Admin Login
+            </button>
+            <button class="ghost-button" id="adminLogout" type="button" title="Admin Logout" hidden>
+              <span aria-hidden="true">⎋</span>
+              Admin Logout
+            </button>
+            <button class="ghost-button" id="exportCsv" type="button" title="Export CSV">
+              <span aria-hidden="true">⇩</span>
+              CSV
+            </button>
+          </div>
+        </header>
+
+        <section class="integration-panel" id="google-sheet" hidden>
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">Google Sheets Sync</p>
+              <h2>เชื่อมต่อ Google Sheet</h2>
+            </div>
+            <button class="ghost-button" id="syncExisting" type="button" title="Upload existing rows">
+              <span aria-hidden="true">↥</span>
+              อัปโหลดข้อมูลเดิม
+            </button>
+          </div>
+          <div class="integration-grid">
+            <label>
+              Apps Script Web App URL
+              <input id="scriptUrlInput" placeholder="https://script.google.com/macros/s/....../exec" />
+            </label>
+            <button class="primary-button" id="saveScriptUrl" type="button">
+              <span aria-hidden="true">✓</span>
+              บันทึกการเชื่อมต่อ
+            </button>
+          </div>
+          <p class="helper-text">
+            ระบบจะจำ URL แยกตามชุดงบประมาณ เช่น งบทำการกับงบ คพจ.2 ผู้ใช้ทั่วไปเปิดเว็บแล้วกรอกได้เลย ส่วนนี้มีไว้สำหรับผู้ดูแลระบบเวลาเปลี่ยน Apps Script เท่านั้น
+          </p>
+        </section>
+
+        <section class="hero-panel" id="overview">
+          <div class="hero-copy">
+            <p id="heroLabel">งบรวม</p>
+            <strong id="totalBudget">0</strong>
+            <span id="budgetCaption">อัปเดตล่าสุดจากรายการทั้งหมด</span>
+          </div>
+          <div class="hero-meter" aria-label="budget used meter">
+            <svg viewBox="0 0 220 220" role="img">
+              <circle class="meter-track" cx="110" cy="110" r="86"></circle>
+              <circle class="meter-value" id="meterValue" cx="110" cy="110" r="86"></circle>
+            </svg>
+            <div>
+              <strong id="usedPercent">0%</strong>
+              <span id="meterCaption">ใช้งบแล้ว</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="kpi-grid" aria-label="budget indicators">
+          <article>
+            <span id="totalUsedLabel">เบิกแล้ว</span>
+            <strong id="totalUsed">0</strong>
+          </article>
+          <article>
+            <span id="totalRemainingLabel">คงเหลือ</span>
+            <strong id="totalRemaining">0</strong>
+          </article>
+          <article>
+            <span id="totalTransactionsLabel">จำนวนรายการ</span>
+            <strong id="totalTransactions">0</strong>
+          </article>
+          <article>
+            <span id="riskCountLabel">หมวดใกล้เต็ม</span>
+            <strong id="riskCount">0</strong>
+          </article>
+        </section>
+
+        <section class="main-grid">
+          <form class="entry-panel" id="claim-form">
+            <div class="section-title">
+              <div>
+                <p class="eyebrow">Budget Claim</p>
+                <h2>ลงคุมรายการเบิก</h2>
+              </div>
+              <span class="status-pill" id="formStatus">พร้อมบันทึก</span>
+            </div>
+
+            <div class="form-grid">
+              <label>
+                หมวดงบ
+                <select id="categoryInput" required></select>
+              </label>
+              <label>
+                ชื่อพนักงาน
+                <input id="employeeInput" list="employeeList" required placeholder="เช่น วางแผน" />
+                <datalist id="employeeList"></datalist>
+              </label>
+              <label class="wide">
+                วันที่/ช่วงวันที่
+                <div class="date-range-inputs">
+                  <input id="startDateInput" required type="date" />
+                  <input id="endDateInput" type="date" />
+                </div>
+              </label>
+              <label>
+                ยอดเบิกครั้งนี้ (บาท)
+                <input id="amountInput" required inputmode="decimal" type="number" min="0" step="0.01" placeholder="0.00" />
+              </label>
+              <label class="wide">
+                รายละเอียด/เลขที่เอกสาร
+                <input id="detailInput" placeholder="เลขที่เอกสาร หรือรายการเบิก" />
+              </label>
+              <label class="wide">
+                หมายเหตุ
+                <input id="noteInput" placeholder="เพิ่มเติมถ้ามี" />
+              </label>
+            </div>
+
+            <div class="claim-preview">
+              <div>
+                <span id="currentRemainingLabel">คงเหลือปัจจุบัน</span>
+                <strong id="currentRemaining">0</strong>
+              </div>
+              <div>
+                <span id="afterRemainingLabel">หลังบันทึกรายการนี้</span>
+                <strong id="afterRemaining">0</strong>
+              </div>
+            </div>
+
+            <button class="primary-button" id="submitClaim" type="submit">
+              <span aria-hidden="true">＋</span>
+              บันทึกรายการเบิก
+            </button>
+          </form>
+
+          <section class="chart-panel">
+            <div class="section-title">
+              <div>
+                <p class="eyebrow">Utilization</p>
+                <h2>การใช้งบตามหมวด</h2>
+              </div>
+            </div>
+            <div class="bar-chart" id="barChart"></div>
+          </section>
+        </section>
+
+        <section class="category-panel" id="categories">
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">Categories</p>
+              <h2>สถานะหมวดงบ</h2>
+            </div>
+            <input class="search-box" id="categorySearch" placeholder="ค้นหาหมวดงบ" />
+          </div>
+          <div class="category-grid" id="categoryGrid"></div>
+        </section>
+
+        <section class="table-panel" id="transactions">
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">Transactions</p>
+              <h2>รายการล่าสุด</h2>
+            </div>
+            <input class="search-box" id="transactionSearch" placeholder="ค้นหารายการ" />
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead id="transactionHead"></thead>
+              <tbody id="transactionRows"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <div class="admin-hint" id="adminHint">ส่วนเชื่อมต่อ Google Sheet ถูกซ่อนไว้สำหรับผู้ดูแลระบบ</div>
+      </main>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
