@@ -1,0 +1,291 @@
+const SHEET_NAMES = {
+  budgetConfig: "BudgetConfig",
+};
+
+const SPREADSHEET_ID = "PUT_YOUR_SPREADSHEET_ID_HERE";
+
+const CATEGORY_HEADERS = ["Category", "Budget"];
+const CATEGORY_SHEET_HEADERS = [
+  "ที่",
+  "ชื่อ - สกุล",
+  "เบิกแล้ว",
+  "คงเหลือ",
+  "เบิกครั้งนี้",
+  "ยอดคงเหลือ",
+  "วัน/เดือน/ปี",
+  "รายละเอียด/เลขที่เอกสาร",
+  "หมายเหตุ",
+];
+
+function doGet(e) {
+  try {
+    setupSheets_();
+    const payload = e && e.parameter && e.parameter.mode === "snapshot"
+      ? getSnapshot_()
+      : {
+          ok: true,
+          message: "PEA Budget category sheets endpoint is ready.",
+        };
+
+    return output_(payload, e);
+  } catch (error) {
+    return output_({
+      ok: false,
+      error: String(error && error.message ? error.message : error),
+    }, e);
+  }
+}
+
+function doPost(e) {
+  try {
+    setupSheets_();
+    const payload = parsePayload_(e);
+
+    if (payload.type === "bulk") {
+      replaceCategories_(payload.categories || []);
+      replaceCategorySheets_(payload.transactions || []);
+      return json_({
+        ok: true,
+        mode: "bulk",
+        count: (payload.transactions || []).length,
+      });
+    }
+
+    if (payload.type === "single" && payload.transaction) {
+      appendTransactionToCategorySheet_(payload.transaction);
+      return json_({
+        ok: true,
+        mode: "single",
+        id: payload.transaction.id,
+        category: payload.transaction.category,
+      });
+    }
+
+    return json_({
+      ok: false,
+      error: "Unknown payload type.",
+    });
+  } catch (error) {
+    return json_({
+      ok: false,
+      error: String(error && error.message ? error.message : error),
+    });
+  }
+}
+
+function parsePayload_(e) {
+  if (e && e.parameter && e.parameter.payload) {
+    return JSON.parse(e.parameter.payload);
+  }
+
+  if (e && e.postData && e.postData.contents) {
+    return JSON.parse(e.postData.contents);
+  }
+
+  throw new Error("Missing payload.");
+}
+
+function setupSheets_() {
+  const spreadsheet = getSpreadsheet_();
+  const configSheet = getOrCreateSheet_(spreadsheet, SHEET_NAMES.budgetConfig);
+  ensureHeader_(configSheet, CATEGORY_HEADERS);
+}
+
+function getSpreadsheet_() {
+  const active = SpreadsheetApp.getActiveSpreadsheet();
+  if (active) return active;
+
+  if (SPREADSHEET_ID && SPREADSHEET_ID !== "PUT_YOUR_SPREADSHEET_ID_HERE") {
+    return SpreadsheetApp.openById(SPREADSHEET_ID);
+  }
+
+  throw new Error("Spreadsheet not found. Bind this script to a Google Sheet or set SPREADSHEET_ID.");
+}
+
+function getOrCreateSheet_(spreadsheet, name) {
+  return spreadsheet.getSheetByName(name) || spreadsheet.insertSheet(name);
+}
+
+function ensureHeader_(sheet, headers) {
+  const firstRow = sheet.getRange(1, 1, 1, headers.length).getValues()[0];
+  const hasHeader = firstRow.some((value) => value !== "");
+
+  if (!hasHeader) {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    sheet.setFrozenRows(1);
+  }
+}
+
+function replaceCategories_(categories) {
+  const spreadsheet = getSpreadsheet_();
+  const sheet = getOrCreateSheet_(spreadsheet, SHEET_NAMES.budgetConfig);
+  sheet.clearContents();
+  sheet.getRange(1, 1, 1, CATEGORY_HEADERS.length).setValues([CATEGORY_HEADERS]);
+  sheet.setFrozenRows(1);
+
+  if (!categories.length) return;
+
+  const rows = categories.map((item) => [
+    item.name || "",
+    Number(item.budget || 0),
+  ]);
+  sheet.getRange(2, 1, rows.length, CATEGORY_HEADERS.length).setValues(rows);
+}
+
+function replaceCategorySheets_(transactions) {
+  const spreadsheet = getSpreadsheet_();
+  const grouped = {};
+
+  transactions.forEach((item) => {
+    const category = String(item.category || "").trim();
+    if (!category) return;
+    if (!grouped[category]) grouped[category] = [];
+    grouped[category].push(item);
+  });
+
+  Object.keys(grouped).forEach((category) => {
+    const sheet = getOrCreateCategorySheet_(spreadsheet, category);
+    resetCategorySheet_(sheet);
+    grouped[category].forEach((item) => appendTransactionRow_(sheet, item, getCategoryBudget_(category)));
+  });
+}
+
+function getOrCreateCategorySheet_(spreadsheet, categoryName) {
+  const sheet = getOrCreateSheet_(spreadsheet, categoryName);
+  ensureHeader_(sheet, CATEGORY_SHEET_HEADERS);
+  return sheet;
+}
+
+function resetCategorySheet_(sheet) {
+  sheet.clearContents();
+  sheet.getRange(1, 1, 1, CATEGORY_SHEET_HEADERS.length).setValues([CATEGORY_SHEET_HEADERS]);
+  sheet.setFrozenRows(1);
+}
+
+function getCategoryBudget_(categoryName) {
+  const spreadsheet = getSpreadsheet_();
+  const sheet = getOrCreateSheet_(spreadsheet, SHEET_NAMES.budgetConfig);
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) {
+    throw new Error("BudgetConfig does not contain category budgets yet.");
+  }
+
+  const values = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
+  const match = values.find((row) => String(row[0]).trim() === String(categoryName).trim());
+  if (!match) {
+    throw new Error(`Category budget not found: ${categoryName}`);
+  }
+
+  return Number(match[1] || 0);
+}
+
+function appendTransactionToCategorySheet_(transaction) {
+  const spreadsheet = getSpreadsheet_();
+  const categoryName = String(transaction.category || "").trim();
+  if (!categoryName) {
+    throw new Error("Missing category.");
+  }
+
+  const budget = getCategoryBudget_(categoryName);
+  const sheet = getOrCreateCategorySheet_(spreadsheet, categoryName);
+  appendTransactionRow_(sheet, transaction, budget);
+}
+
+function appendTransactionRow_(sheet, transaction, budget) {
+  const dataStartRow = 2;
+  const lastRow = Math.max(sheet.getLastRow(), dataStartRow);
+  const dataRowCount = Math.max(lastRow - 1, 1);
+  const existingRows = sheet.getRange(dataStartRow, 1, dataRowCount, CATEGORY_SHEET_HEADERS.length).getValues();
+  const populatedRows = existingRows.filter((row) => row.slice(1).some((cell) => cell !== ""));
+  const nextIndex = populatedRows.length + 1;
+  let usedBefore = 0;
+  let remainingBefore = Number(budget || 0);
+
+  if (populatedRows.length) {
+    const lastValues = populatedRows[populatedRows.length - 1];
+    usedBefore = Number(lastValues[2] || 0) + Number(lastValues[4] || 0);
+    remainingBefore = Number(lastValues[5] || budget || 0);
+  }
+
+  const amount = Number(transaction.amount || 0);
+  const remainingAfter = remainingBefore - amount;
+  const row = [
+    nextIndex,
+    transaction.employee || "",
+    usedBefore,
+    remainingBefore,
+    amount,
+    remainingAfter,
+    transaction.date || "",
+    transaction.detail || "",
+    transaction.note || "",
+  ];
+
+  const firstEmptyOffset = existingRows.findIndex((existingRow) => existingRow.slice(1).every((cell) => cell === ""));
+  const targetRow = firstEmptyOffset >= 0 ? dataStartRow + firstEmptyOffset : lastRow + 1;
+  sheet.getRange(targetRow, 1, 1, CATEGORY_SHEET_HEADERS.length).setValues([row]);
+}
+
+function getSnapshot_() {
+  const spreadsheet = getSpreadsheet_();
+  const configSheet = getOrCreateSheet_(spreadsheet, SHEET_NAMES.budgetConfig);
+  const configLastRow = configSheet.getLastRow();
+  const categoryRows = configLastRow >= 2
+    ? configSheet.getRange(2, 1, configLastRow - 1, 2).getValues()
+    : [];
+
+  const categories = categoryRows
+    .filter((row) => row[0] !== "")
+    .map((row) => ({
+      name: String(row[0]).trim(),
+      budget: Number(row[1] || 0),
+    }));
+
+  const transactions = [];
+  let nextId = 1;
+
+  categories.forEach((category) => {
+    const sheet = spreadsheet.getSheetByName(category.name);
+    if (!sheet) return;
+
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) return;
+
+    const rows = sheet.getRange(2, 1, lastRow - 1, CATEGORY_SHEET_HEADERS.length).getValues();
+    rows.forEach((row) => {
+      if (!row.slice(1).some((cell) => cell !== "")) return;
+      transactions.push({
+        id: nextId++,
+        date: row[6] || "",
+        category: category.name,
+        employee: row[1] || "",
+        detail: row[7] || "",
+        amount: Number(row[4] || 0),
+        note: row[8] || "",
+      });
+    });
+  });
+
+  return {
+    ok: true,
+    categories: categories,
+    transactions: transactions,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function output_(data, e) {
+  const callback = e && e.parameter ? e.parameter.callback : "";
+  if (callback) {
+    return ContentService
+      .createTextOutput(`${callback}(${JSON.stringify(data)})`)
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  return json_(data);
+}
+
+function json_(data) {
+  return ContentService
+    .createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON);
+}
