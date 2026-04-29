@@ -152,6 +152,46 @@ let syncTimer = null;
 let isAdmin = localStorage.getItem(adminSessionKey) === "true";
 let pendingTransaction = null;
 
+function ensureClaimConfirmDialog() {
+  if (!els.claimConfirmDialog) {
+    document.body.insertAdjacentHTML(
+      "beforeend",
+      `
+        <div class="confirm-overlay" id="claimConfirmDialog" role="dialog" aria-modal="true" aria-labelledby="claimConfirmTitle" hidden>
+          <div class="confirm-dialog">
+            <div class="confirm-header">
+              <div>
+                <p class="eyebrow">Confirm Claim</p>
+                <h2 id="claimConfirmTitle">ยืนยันรายการเบิก</h2>
+              </div>
+            </div>
+            <dl class="confirm-list">
+              <div><dt>งบประมาณ</dt><dd id="confirmBudget">-</dd></div>
+              <div><dt>หมวดงบ</dt><dd id="confirmCategory">-</dd></div>
+              <div><dt>ชื่อ</dt><dd id="confirmEmployee">-</dd></div>
+              <div><dt>วันที่</dt><dd id="confirmDate">-</dd></div>
+              <div><dt>ยอดเบิกจ่าย</dt><dd id="confirmAmount">-</dd></div>
+            </dl>
+            <div class="confirm-actions">
+              <button class="ghost-button" id="editClaim" type="button">แก้ไข</button>
+              <button class="primary-button" id="confirmClaim" type="button">ยืนยัน</button>
+            </div>
+          </div>
+        </div>
+      `,
+    );
+  }
+
+  els.claimConfirmDialog = document.querySelector("#claimConfirmDialog");
+  els.confirmBudget = document.querySelector("#confirmBudget");
+  els.confirmCategory = document.querySelector("#confirmCategory");
+  els.confirmEmployee = document.querySelector("#confirmEmployee");
+  els.confirmDate = document.querySelector("#confirmDate");
+  els.confirmAmount = document.querySelector("#confirmAmount");
+  els.editClaim = document.querySelector("#editClaim");
+  els.confirmClaim = document.querySelector("#confirmClaim");
+}
+
 function structuredBudgetSeed(key) {
   return structuredClone(budgetProfiles[key].seedData);
 }
@@ -1012,7 +1052,7 @@ async function saveConfirmedTransaction(transaction) {
   }
 }
 
-async function handleSubmit(event) {
+async function handleSubmitLegacyUnused(event) {
   event.preventDefault();
   const amount = Number(els.amountInput.value || 0);
   const category = calcCategory(els.categoryInput.value);
@@ -1058,6 +1098,16 @@ async function handleSubmit(event) {
     els.submitClaim.innerHTML = '<span aria-hidden="true">＋</span>บันทึกรายการเบิก';
     updateFormPreview();
   }
+}
+
+function handleSubmit(event) {
+  event.preventDefault();
+  const amount = Number(els.amountInput.value || 0);
+  const category = calcCategory(els.categoryInput.value);
+  if (amount <= 0) return;
+  if (activeBudgetKey() !== "kpj2" && category.remaining - amount < 0) return;
+
+  openClaimConfirmDialog(buildTransaction(amount));
 }
 
 function saveScriptUrl() {
@@ -1130,6 +1180,8 @@ const storedBudget = localStorage.getItem(activeBudgetKeyName);
 if (storedBudget && Object.prototype.hasOwnProperty.call(budgetProfiles, storedBudget)) {
   state.activeBudget = storedBudget;
 }
+
+ensureClaimConfirmDialog();
 
 els.claimForm.addEventListener("submit", handleSubmit);
 els.budgetSwitch.addEventListener("change", (event) => {
