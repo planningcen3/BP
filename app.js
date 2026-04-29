@@ -1131,14 +1131,24 @@ async function deleteTransaction(item) {
   deletingTransactionId = item.id;
   renderTransactions();
 
+  const transactions = activeTransactions();
+  const index = transactions.findIndex((transaction) => transaction.id === item.id);
+  if (index < 0) {
+    deletingTransactionId = null;
+    renderTransactions();
+    return;
+  }
+
+  transactions.splice(index, 1);
+  saveState();
+
   try {
-    await postToGoogleSheet({ type: "delete", transaction: item });
-    const transactions = activeTransactions();
-    const index = transactions.findIndex((transaction) => transaction.id === item.id);
-    if (index >= 0) {
-      transactions.splice(index, 1);
-      saveState();
-    }
+    await postToGoogleSheet({
+      type: "bulk",
+      categories: activeCategories(),
+      transactions: activeTransactions(),
+      exportedAt: new Date().toISOString(),
+    });
     setSheetStatus(
       hasScriptUrl() ? "online" : "offline",
       hasScriptUrl() ? `ลบรายการจาก ${activeBudgetProfile().label} แล้ว` : `ลบรายการ ${activeBudgetProfile().label} ในเครื่องแล้ว ยังไม่ส่ง Google Sheet`,

@@ -145,6 +145,7 @@ function replaceCategories_(categories) {
 function replaceCategorySheets_(transactions) {
   const spreadsheet = getSpreadsheet_();
   const grouped = {};
+  const categories = getConfiguredCategoryNames_();
 
   transactions.forEach((item) => {
     const category = String(item.category || "").trim();
@@ -153,11 +154,24 @@ function replaceCategorySheets_(transactions) {
     grouped[category].push(item);
   });
 
-  Object.keys(grouped).forEach((category) => {
+  categories.forEach((category) => {
     const sheet = getOrCreateCategorySheet_(spreadsheet, category);
     resetCategorySheet_(sheet);
-    grouped[category].forEach((item) => appendTransactionRow_(sheet, item, getCategoryBudget_(category)));
+    (grouped[category] || []).forEach((item) => appendTransactionRow_(sheet, item, getCategoryBudget_(category)));
   });
+}
+
+function getConfiguredCategoryNames_() {
+  const spreadsheet = getSpreadsheet_();
+  const sheet = getOrCreateSheet_(spreadsheet, SHEET_NAMES.budgetConfig);
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return [];
+
+  return sheet
+    .getRange(2, 1, lastRow - 1, 1)
+    .getValues()
+    .map((row) => String(row[0] || "").trim())
+    .filter((name) => name !== "");
 }
 
 function getOrCreateCategorySheet_(spreadsheet, categoryName) {
