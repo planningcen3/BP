@@ -151,6 +151,7 @@ const els = {
 let syncTimer = null;
 let isAdmin = localStorage.getItem(adminSessionKey) === "true";
 let pendingTransaction = null;
+let deletingTransactionId = null;
 
 function ensureClaimConfirmDialog() {
   if (!els.claimConfirmDialog) {
@@ -849,6 +850,9 @@ function renderTransactionHead() {
 
 function renderTransactions() {
   renderTransactionHead();
+  if (isAdmin) {
+    els.transactionHead.querySelector("tr")?.insertAdjacentHTML("beforeend", `<th class="action-column">จัดการ</th>`);
+  }
   const query = els.transactionSearch.value.trim().toLowerCase();
   const rows = [...activeTransactions()]
     .sort((a, b) => {
@@ -860,7 +864,7 @@ function renderTransactions() {
     .slice(0, 80);
 
   if (!rows.length) {
-    els.transactionRows.innerHTML = `<tr><td class="empty-state" colspan="7">ยังไม่มีรายการใน${activeBudgetProfile().label}</td></tr>`;
+    els.transactionRows.innerHTML = `<tr><td class="empty-state" colspan="${isAdmin ? 8 : 7}">ยังไม่มีรายการใน${activeBudgetProfile().label}</td></tr>`;
     return;
   }
 
@@ -875,6 +879,7 @@ function renderTransactions() {
           <td>${item.detail || item.note || "-"}</td>
           <td>${money(item.amount)}</td>
           <td>${money(getRunningUsedAfter(item))}</td>
+          ${renderDeleteCell(item)}
         </tr>
       `)
       .join("");
@@ -891,9 +896,17 @@ function renderTransactions() {
         <td>${item.detail || item.note || "-"}</td>
         <td>${money(item.amount)}</td>
         <td>${money(getRunningRemaining(item))}</td>
+        ${renderDeleteCell(item)}
       </tr>
     `)
     .join("");
+}
+
+function renderDeleteCell(item) {
+  if (!isAdmin) return "";
+  const disabled = deletingTransactionId === item.id ? " disabled" : "";
+  const text = deletingTransactionId === item.id ? "กำลังลบ..." : "ลบ";
+  return `<td class="action-cell"><button class="delete-row-button" type="button" data-delete-id="${item.id}"${disabled}>${text}</button></td>`;
 }
 
 function updateFormPreview() {
@@ -1110,6 +1123,35 @@ function handleSubmit(event) {
   openClaimConfirmDialog(buildTransaction(amount));
 }
 
+async function deleteTransaction(item) {
+  if (!item || deletingTransactionId) return;
+  const ok = window.confirm(`ยืนยันลบรายการของ ${canonicalEmployeeName(item.employee) || "-"} ยอด ${money(item.amount)} บาท ใช่ไหม`);
+  if (!ok) return;
+
+  deletingTransactionId = item.id;
+  renderTransactions();
+
+  try {
+    await postToGoogleSheet({ type: "delete", transaction: item });
+    const transactions = activeTransactions();
+    const index = transactions.findIndex((transaction) => transaction.id === item.id);
+    if (index >= 0) {
+      transactions.splice(index, 1);
+      saveState();
+    }
+    setSheetStatus(
+      hasScriptUrl() ? "online" : "offline",
+      hasScriptUrl() ? `ลบรายการจาก ${activeBudgetProfile().label} แล้ว` : `ลบรายการ ${activeBudgetProfile().label} ในเครื่องแล้ว ยังไม่ส่ง Google Sheet`,
+    );
+    renderAll();
+  } catch {
+    setSheetStatus("error", `ลบรายการ ${activeBudgetProfile().label} ไม่สำเร็จ ตรวจ Apps Script URL หรือ deploy เวอร์ชันล่าสุด`);
+  } finally {
+    deletingTransactionId = null;
+    renderTransactions();
+  }
+}
+
 function saveScriptUrl() {
   const nextScriptUrl = cleanScriptUrl(els.scriptUrlInput.value) || budgetProfiles[activeBudgetKey()].embeddedScriptUrl || "";
   scriptUrls[activeBudgetKey()] = nextScriptUrl;
@@ -1164,7 +1206,7 @@ function handleAdminLogin() {
   if (username === "admin" && password === "planningc3") {
     isAdmin = true;
     localStorage.setItem(adminSessionKey, "true");
-    renderAdminState();
+    renderAll();
   } else {
     window.alert("ID หรือ Password ไม่ถูกต้อง");
   }
@@ -1173,7 +1215,7 @@ function handleAdminLogin() {
 function handleAdminLogout() {
   isAdmin = false;
   localStorage.removeItem(adminSessionKey);
-  renderAdminState();
+  renderAll();
 }
 
 const storedBudget = localStorage.getItem(activeBudgetKeyName);
@@ -1202,6 +1244,13 @@ els.adminLogout.addEventListener("click", handleAdminLogout);
 els.saveScriptUrl.addEventListener("click", saveScriptUrl);
 els.scriptUrlInput.addEventListener("change", saveScriptUrl);
 els.syncExisting.addEventListener("click", syncExisting);
+els.transactionRows.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-delete-id]");
+  if (!button || !isAdmin) return;
+  const id = Number(button.dataset.deleteId);
+  const item = activeTransactions().find((transaction) => transaction.id === id);
+  deleteTransaction(item);
+});
 els.editClaim.addEventListener("click", closeClaimConfirmDialog);
 els.confirmClaim.addEventListener("click", () => {
   if (pendingTransaction) {

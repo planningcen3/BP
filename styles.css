@@ -236,6 +236,22 @@ h2 {
   box-shadow: 0 10px 24px rgba(23, 32, 51, 0.08);
 }
 
+.delete-row-button {
+  min-height: 34px;
+  padding: 0 12px;
+  color: var(--danger);
+  border: 1px solid #f4b4b4;
+  border-radius: 8px;
+  background: #fff5f5;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.delete-row-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
 .primary-button {
   width: 100%;
   padding: 0 18px;
@@ -738,8 +754,16 @@ th {
 
 td:last-child,
 td:nth-child(6),
+td:nth-child(7),
 th:last-child,
-th:nth-child(6) {
+th:nth-child(6),
+th:nth-child(7) {
+  text-align: right;
+}
+
+.action-column,
+.action-cell {
+  width: 92px;
   text-align: right;
 }
 

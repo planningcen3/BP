@@ -59,6 +59,16 @@ function doPost(e) {
       });
     }
 
+    if (payload.type === "delete" && payload.transaction) {
+      const deleted = deleteTransactionFromCategorySheet_(payload.transaction);
+      return json_({
+        ok: true,
+        mode: "delete",
+        deleted: deleted,
+        category: payload.transaction.category,
+      });
+    }
+
     return json_({
       ok: false,
       error: "Unknown payload type.",
@@ -214,6 +224,57 @@ function appendTransactionRow_(sheet, transaction, carryOver) {
   const firstEmptyOffset = existingRows.findIndex((existingRow) => existingRow.slice(1).every((cell) => cell === ""));
   const targetRow = firstEmptyOffset >= 0 ? dataStartRow + firstEmptyOffset : lastRow + 1;
   sheet.getRange(targetRow, 1, 1, CATEGORY_SHEET_HEADERS.length).setValues([row]);
+}
+
+function deleteTransactionFromCategorySheet_(transaction) {
+  const spreadsheet = getSpreadsheet_();
+  const categoryName = String(transaction.category || "").trim();
+  if (!categoryName) {
+    throw new Error("Missing category.");
+  }
+
+  const sheet = spreadsheet.getSheetByName(categoryName);
+  if (!sheet || sheet.getLastRow() < 2) return false;
+
+  const lastRow = sheet.getLastRow();
+  const rows = sheet.getRange(2, 1, lastRow - 1, CATEGORY_SHEET_HEADERS.length).getValues();
+  const targetIndex = rows.findIndex((row) => transactionRowMatches_(row, transaction));
+  if (targetIndex < 0) return false;
+
+  const remainingTransactions = rows
+    .filter((row, index) => index !== targetIndex && row.slice(1).some((cell) => cell !== ""))
+    .map((row) => ({
+      date: row[6] || "",
+      category: categoryName,
+      employee: row[1] || "",
+      detail: "",
+      amount: Number(row[4] || 0),
+      note: "",
+    }));
+
+  resetCategorySheet_(sheet);
+  const carryOver = getCategoryCarryOver_(categoryName);
+  remainingTransactions.forEach((item) => appendTransactionRow_(sheet, item, carryOver));
+  return true;
+}
+
+function transactionRowMatches_(row, transaction) {
+  return normalizeDate_(row[6]) === normalizeDate_(transaction.date)
+    && normalize_(row[1]) === normalize_(transaction.employee)
+    && Number(row[4] || 0) === Number(transaction.amount || 0);
+}
+
+function normalizeDate_(value) {
+  if (Object.prototype.toString.call(value) === "[object Date]" && !isNaN(value.getTime())) {
+    return Utilities.formatDate(value, Session.getScriptTimeZone(), "yyyy-MM-dd");
+  }
+  const text = normalize_(value);
+  const isoDate = text.match(/^(\d{4}-\d{2}-\d{2})/);
+  return isoDate ? isoDate[1] : text;
+}
+
+function normalize_(value) {
+  return String(value == null ? "" : value).trim();
 }
 
 function getSnapshot_() {
