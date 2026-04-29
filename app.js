@@ -138,10 +138,19 @@ const els = {
   integrationCard: document.querySelector(".integration-card"),
   googleSheetSection: document.querySelector("#google-sheet"),
   adminHint: document.querySelector("#adminHint"),
+  claimConfirmDialog: document.querySelector("#claimConfirmDialog"),
+  confirmBudget: document.querySelector("#confirmBudget"),
+  confirmCategory: document.querySelector("#confirmCategory"),
+  confirmEmployee: document.querySelector("#confirmEmployee"),
+  confirmDate: document.querySelector("#confirmDate"),
+  confirmAmount: document.querySelector("#confirmAmount"),
+  editClaim: document.querySelector("#editClaim"),
+  confirmClaim: document.querySelector("#confirmClaim"),
 };
 
 let syncTimer = null;
 let isAdmin = localStorage.getItem(adminSessionKey) === "true";
+let pendingTransaction = null;
 
 function structuredBudgetSeed(key) {
   return structuredClone(budgetProfiles[key].seedData);
@@ -935,12 +944,83 @@ async function postToGoogleSheet(payload) {
   return { ok: true };
 }
 
+function buildTransaction(amount) {
+  const transactions = activeTransactions();
+  return {
+    id: Math.max(0, ...transactions.map((item) => item.id)) + 1,
+    date: formatDateRangeForStorage(els.startDateInput.value, els.endDateInput.value),
+    category: els.categoryInput.value,
+    employee: canonicalEmployeeName(els.employeeInput.value),
+    detail: els.detailInput.value.trim(),
+    amount,
+    note: els.noteInput.value.trim(),
+    createdAt: new Date().toISOString(),
+  };
+}
+
+function openClaimConfirmDialog(transaction) {
+  pendingTransaction = transaction;
+  els.confirmBudget.textContent = activeBudgetProfile().label;
+  els.confirmCategory.textContent = transaction.category || "-";
+  els.confirmEmployee.textContent = transaction.employee || "-";
+  els.confirmDate.textContent = transaction.date || "-";
+  els.confirmAmount.textContent = money(transaction.amount);
+  els.claimConfirmDialog.hidden = false;
+  els.confirmClaim.disabled = false;
+  els.confirmClaim.textContent = "ยืนยัน";
+  els.confirmClaim.focus();
+}
+
+function closeClaimConfirmDialog() {
+  pendingTransaction = null;
+  els.claimConfirmDialog.hidden = true;
+  els.submitClaim.disabled = false;
+  updateFormPreview();
+  els.submitClaim.focus();
+}
+
+async function saveConfirmedTransaction(transaction) {
+  els.submitClaim.disabled = true;
+  els.submitClaim.textContent = "กำลังบันทึก...";
+  els.confirmClaim.disabled = true;
+  els.confirmClaim.textContent = "กำลังบันทึก...";
+
+  try {
+    await postToGoogleSheet({ type: "single", transaction });
+    activeTransactions().push(transaction);
+    saveState();
+    setSheetStatus(
+      hasScriptUrl() ? "online" : "offline",
+      hasScriptUrl() ? `ส่งรายการล่าสุดของ${activeBudgetProfile().label}แล้ว` : `บันทึก ${activeBudgetProfile().label} ไว้ในเครื่อง ยังไม่ส่ง Google Sheet`,
+    );
+    els.claimForm.reset();
+    els.categoryInput.value = activeCategories()[0]?.name || "";
+    els.startDateInput.value = getTodayInputValue();
+    els.endDateInput.value = "";
+    pendingTransaction = null;
+    els.claimConfirmDialog.hidden = true;
+    renderAll();
+    els.employeeInput.focus();
+  } catch {
+    setSheetStatus("error", `ส่ง ${activeBudgetProfile().label} ไป Google Sheet ไม่สำเร็จ ตรวจ URL หรือสิทธิ์ deploy`);
+    els.submitClaim.disabled = false;
+    els.confirmClaim.disabled = false;
+    els.confirmClaim.textContent = "ยืนยัน";
+  } finally {
+    els.submitClaim.innerHTML = '<span aria-hidden="true">＋</span>บันทึกรายการเบิก';
+    updateFormPreview();
+  }
+}
+
 async function handleSubmit(event) {
   event.preventDefault();
   const amount = Number(els.amountInput.value || 0);
   const category = calcCategory(els.categoryInput.value);
   if (amount <= 0) return;
   if (activeBudgetKey() !== "kpj2" && category.remaining - amount < 0) return;
+
+  openClaimConfirmDialog(buildTransaction(amount));
+  return;
 
   const transactions = activeTransactions();
   const transaction = {
@@ -1070,6 +1150,22 @@ els.adminLogout.addEventListener("click", handleAdminLogout);
 els.saveScriptUrl.addEventListener("click", saveScriptUrl);
 els.scriptUrlInput.addEventListener("change", saveScriptUrl);
 els.syncExisting.addEventListener("click", syncExisting);
+els.editClaim.addEventListener("click", closeClaimConfirmDialog);
+els.confirmClaim.addEventListener("click", () => {
+  if (pendingTransaction) {
+    saveConfirmedTransaction(pendingTransaction);
+  }
+});
+els.claimConfirmDialog.addEventListener("click", (event) => {
+  if (event.target === els.claimConfirmDialog) {
+    closeClaimConfirmDialog();
+  }
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !els.claimConfirmDialog.hidden) {
+    closeClaimConfirmDialog();
+  }
+});
 
 renderAll();
 startAutoSync();

@@ -249,6 +249,78 @@ h2 {
   opacity: 0.58;
 }
 
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(23, 32, 51, 0.48);
+}
+
+.confirm-overlay[hidden] {
+  display: none;
+}
+
+.confirm-dialog {
+  width: min(100%, 480px);
+  max-height: calc(100vh - 36px);
+  overflow: auto;
+  padding: 22px;
+  border: 1px solid rgba(228, 231, 236, 0.9);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 24px 72px rgba(23, 32, 51, 0.24);
+}
+
+.confirm-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.confirm-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.confirm-list div {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 14px;
+  padding: 12px;
+  border-radius: 8px;
+  background: #f9fafb;
+}
+
+.confirm-list dt {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.confirm-list dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-weight: 800;
+}
+
+.confirm-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.confirm-actions .primary-button,
+.confirm-actions .ghost-button {
+  width: 100%;
+}
+
 .hero-panel,
 .integration-panel,
 .entry-panel,
@@ -824,6 +896,15 @@ th:nth-child(6) {
   .section-title .ghost-button,
   .primary-button {
     width: 100%;
+  }
+
+  .confirm-dialog {
+    padding: 18px;
+  }
+
+  .confirm-list div,
+  .confirm-actions {
+    grid-template-columns: 1fr;
   }
 
   .hero-panel,
