@@ -345,12 +345,10 @@ h2 {
 .table-panel,
 .kpi-grid article {
   min-width: 0;
-  border: 2px solid rgba(90, 42, 130, 0.62);
+  border: 1px solid var(--line);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.86);
-  box-shadow:
-    0 16px 38px rgba(90, 42, 130, 0.14),
-    0 0 0 1px rgba(255, 255, 255, 0.72) inset;
+  background: #fff;
+  box-shadow: 0 18px 48px rgba(23, 32, 51, 0.08);
 }
 
 .hero-panel {
@@ -465,17 +463,7 @@ h2 {
   gap: 8px;
   padding: 18px;
   overflow: hidden;
-  background:
-    linear-gradient(180deg, #fff, #fbf8ff),
-    var(--surface);
-}
-
-.kpi-grid article::before {
-  content: "";
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 5px;
-  background: linear-gradient(180deg, var(--pea-purple), var(--pea-gold));
+  background: #fff;
 }
 
 .kpi-grid span,
@@ -502,30 +490,14 @@ h2 {
   padding: 20px;
 }
 
-.chart-panel,
-.category-panel,
-.table-panel {
-  border-top: 5px solid var(--pea-gold);
-}
-
 .entry-panel {
   position: relative;
   overflow: hidden;
-  border-color: var(--pea-purple);
-  background:
-    linear-gradient(180deg, rgba(255, 250, 237, 0.98), rgba(246, 239, 255, 0.95)),
-    var(--surface);
+  border-color: var(--line);
+  background: #fff;
   box-shadow:
     0 22px 58px rgba(90, 42, 130, 0.14),
     inset 0 1px 0 rgba(255, 255, 255, 0.88);
-}
-
-.entry-panel::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto;
-  height: 5px;
-  background: linear-gradient(90deg, var(--pea-purple), var(--pea-gold));
 }
 
 .entry-panel .section-title,
