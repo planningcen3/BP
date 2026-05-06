@@ -487,6 +487,33 @@ h2 {
   padding: 20px;
 }
 
+.entry-panel {
+  position: relative;
+  overflow: hidden;
+  border-color: rgba(90, 42, 130, 0.24);
+  background:
+    linear-gradient(180deg, rgba(255, 250, 237, 0.98), rgba(246, 239, 255, 0.95)),
+    var(--surface);
+  box-shadow:
+    0 22px 58px rgba(90, 42, 130, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.88);
+}
+
+.entry-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 5px;
+  background: linear-gradient(90deg, var(--pea-purple), var(--pea-gold));
+}
+
+.entry-panel .section-title,
+.entry-panel .form-grid,
+.entry-panel .claim-preview,
+.entry-panel .primary-button {
+  position: relative;
+}
+
 .section-title {
   display: flex;
   align-items: center;
@@ -563,7 +590,9 @@ select:focus {
   gap: 5px;
   padding: 14px;
   border-radius: 8px;
-  background: var(--pea-purple-soft);
+  border: 1px solid rgba(90, 42, 130, 0.12);
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 10px 24px rgba(90, 42, 130, 0.08);
 }
 
 .claim-preview strong {
