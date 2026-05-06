@@ -345,10 +345,12 @@ h2 {
 .table-panel,
 .kpi-grid article {
   min-width: 0;
-  border: 1px solid rgba(228, 231, 236, 0.9);
+  border: 2px solid rgba(90, 42, 130, 0.62);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.86);
-  box-shadow: 0 18px 48px rgba(23, 32, 51, 0.08);
+  box-shadow:
+    0 16px 38px rgba(90, 42, 130, 0.14),
+    0 0 0 1px rgba(255, 255, 255, 0.72) inset;
 }
 
 .hero-panel {
@@ -458,9 +460,22 @@ h2 {
 }
 
 .kpi-grid article {
+  position: relative;
   display: grid;
   gap: 8px;
   padding: 18px;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, #fff, #fbf8ff),
+    var(--surface);
+}
+
+.kpi-grid article::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 5px;
+  background: linear-gradient(180deg, var(--pea-purple), var(--pea-gold));
 }
 
 .kpi-grid span,
@@ -487,10 +502,16 @@ h2 {
   padding: 20px;
 }
 
+.chart-panel,
+.category-panel,
+.table-panel {
+  border-top: 5px solid var(--pea-gold);
+}
+
 .entry-panel {
   position: relative;
   overflow: hidden;
-  border-color: rgba(90, 42, 130, 0.24);
+  border-color: var(--pea-purple);
   background:
     linear-gradient(180deg, rgba(255, 250, 237, 0.98), rgba(246, 239, 255, 0.95)),
     var(--surface);
